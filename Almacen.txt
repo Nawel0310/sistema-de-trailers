@@ -1,0 +1,95 @@
+@Service
+public class AlmacenServicioImpl implements AlmacenService {
+
+    @Value("${storage.location}")
+    private String storageLocation;
+
+    @PostConstruct//Sirve para indicar que este método se va a ejecutar
+    // cada vez que haya una nueva instancia de esta clase
+    @Override
+    public void iniciarAlmacenDearchivos() {
+        try{
+            Files.createDirectories(Paths.get(storageLocation));
+            //Cada vez que inicializamos obtenemos la ubicación de las portadas.
+        }catch(IOException exception){
+            throw new AlmacenException("Error al inicilizar la ubicación en el " +
+                    "almacen de archivos.");
+        }
+    }
+
+    @Override
+    public String almacenarArchivo(MultipartFile archivo) {
+        String nombreArchivo = archivo.getOriginalFilename();
+        if (archivo.isEmpty()){
+            throw new AlmacenException(("No se puede almacenar un archivo vacío"));
+        }
+        try{
+            InputStream inputStream = archivo.getInputStream();
+            Files.copy(inputStream,Paths.get(storageLocation).resolve(nombreArchivo),
+                    StandardCopyOption.REPLACE_EXISTING);
+            //Si hay un archivo con el mismo nombre, lo va a reemplazar.
+        }catch(IOException exception){
+            throw new AlmacenException("Error al almacenar el archivo "+ nombreArchivo,exception);
+        }
+        return nombreArchivo;
+    }
+
+    @Override
+    public Path cargarArchivo(String nombreArchivo) {
+        return Paths.get(storageLocation).resolve(nombreArchivo);
+    }
+
+    @Override
+    public Resource cargarComoRecurso(String nombreArchivo) {
+        try{
+            Path archivo = cargarArchivo(nombreArchivo);
+            Resource recurso= new UrlResource(archivo.toUri());
+
+            if(recurso.exists() || recurso.isReadable()){
+                return recurso;
+            }else{
+                throw new FileNotFoundException("No se pudo encontrar el archivo "+nombreArchivo);
+            }
+
+        }catch(MalformedURLException exception){
+            throw new FileNotFoundException("No se pudo encontrar el archivo " + nombreArchivo,exception);
+        }
+    }
+
+    @Override
+    public void eliminarArchivo(String nombreArchivo) {
+        Path archivo = cargarArchivo(nombreArchivo);
+        try {
+            FileSystemUtils.deleteRecursively(archivo);
+        }catch (Exception exception) {
+            throw new FileNotFoundException("No se pudo eliminar el archivo " + nombreArchivo,exception);
+        }
+
+    }
+
+
+
+public interface AlmacenService {
+    void iniciarAlmacenDearchivos();
+    String almacenarArchivo(MultipartFile archivo);
+    Path cargarArchivo(String nombreArchivo);
+    Resource cargarComoRecurso(String nombreArchivo);
+    void eliminarArchivo(String nombreArchivo);
+
+}
+
+
+public class AlmacenException extends RuntimeException {
+    @Serial
+    private static final long serialVersionUID = 1L;//Nos permite asegurarnos la
+    // serialización de la misma clase, aunque se realicen cambios posteriores
+
+    public AlmacenException(String mensaje){
+        super(mensaje);
+    }
+
+    public AlmacenException(String mensaje,Throwable excepcion){
+        super(mensaje,excepcion);
+    }
+}
+
